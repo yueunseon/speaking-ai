@@ -19,6 +19,10 @@
 	import ConversationHistory from '$lib/components/ConversationHistory.svelte';
 	import PastConversations from '$lib/components/PastConversations.svelte';
 	import SessionSelector from '$lib/components/SessionSelector.svelte';
+	import PromptSettings from '$lib/components/PromptSettings.svelte';
+	import UserOnboarding from '$lib/components/UserOnboarding.svelte';
+	import { generatePrompt } from '$lib/utils/prompt.js';
+	import { checkUserOnboarding } from '$lib/utils/user.js';
 
 	// 상태 관리
 	let recorder = null;
@@ -157,15 +161,20 @@
 
 			// 세션이 없으면 새로 생성 (비동기로 처리, 실패해도 녹음 진행)
 			if (!currentSessionId) {
-				console.log('🆕 새 세션 생성 시작 (비동기)');
+				console.log('🆕 새 세션 생성 시작 (비동기)', { promptSettings });
 				const userId = $user?.id;
 				if (userId) {
 					// 세션 생성을 비동기로 처리 (녹음 시작을 막지 않음)
-					createConversationSession(null, userId)
+					createConversationSession(null, userId, promptSettings)
 						.then((newSession) => {
 							if (newSession && newSession.id) {
 								currentSessionId = newSession.id;
-								console.log('✅ 세션 생성 성공 (비동기):', currentSessionId);
+								console.log('✅ 세션 생성 성공 (비동기):', {
+									sessionId: currentSessionId,
+									hasPromptSettings: !!newSession?.prompt_settings,
+									promptSettings: newSession?.prompt_settings,
+									originalPromptSettings: promptSettings
+								});
 							} else {
 								console.warn('⚠️ 세션 생성 결과가 예상과 다름:', newSession);
 							}
@@ -244,6 +253,12 @@
 		console.log('세션 선택됨:', session);
 		currentSessionId = session.id;
 		
+		// 세션의 프롬프트 설정 불러오기
+		if (session.prompt_settings) {
+			promptSettings = session.prompt_settings;
+			console.log('세션 프롬프트 설정 불러옴:', promptSettings);
+		}
+		
 		// 과거 기록 불러오기
 		try {
 			const userId = $user?.id;
@@ -306,10 +321,11 @@
 		errorMessage = '';
 
 		try {
+			const customPrompt = generatePrompt(promptSettings);
 			const result = await sendAudioToAI(blob, 'webm', (debug) => {
 				debugInfo = debug;
 				showDebug = true;
-			});
+			}, customPrompt);
 
 			// 사용자 텍스트와 AI 응답 텍스트 저장
 			userText = result.userText || '';
@@ -415,6 +431,16 @@
 		conversations = []; // 현재 세션의 대화 기록도 초기화
 		resetRecording();
 		
+		// 프롬프트 설정을 기본값으로 초기화 (다음 세션에서 새로 설정 가능하도록)
+		promptSettings = {
+			mode: 'preset',
+			tone: 'warm',
+			correctionStyle: 'gently',
+			responseLength: 'concise',
+			conversationStyle: 'natural',
+			customPrompt: ''
+		};
+		
 		// 과거 세션 다시 확인 (버튼 활성화를 위해)
 		if ($user) {
 			await checkPastSessions();
@@ -437,6 +463,62 @@
 	let checkAttempts = $state(0); // 호출 횟수 추적
 	const MAX_CHECK_ATTEMPTS = 3; // 최대 호출 횟수
 	const CHECK_TIMEOUT = 5000; // 타임아웃 (5초)
+
+	// 프롬프트 설정
+	let promptSettings = $state({
+		mode: 'preset', // 'preset' or 'custom'
+		tone: 'warm',
+		correctionStyle: 'gently',
+		responseLength: 'concise',
+		conversationStyle: 'natural',
+		customPrompt: ''
+	});
+	let showPromptSettings = $state(false);
+	
+	// 온보딩 상태
+	let showOnboarding = $state(false);
+	let checkingOnboarding = $state(false);
+	let onboardingChecked = $state(false);
+	
+	// 온보딩 완료 처리
+	async function handleOnboardingComplete() {
+		showOnboarding = false;
+		onboardingChecked = true;
+		// 페이지 새로고침하여 모든 상태 초기화
+		window.location.reload();
+	}
+	
+	// 온보딩 확인
+	async function checkOnboarding() {
+		if (!$user || checkingOnboarding || onboardingChecked) {
+			return;
+		}
+		
+		checkingOnboarding = true;
+		try {
+			const isOnboarded = await checkUserOnboarding();
+			if (!isOnboarded) {
+				showOnboarding = true;
+			}
+			onboardingChecked = true;
+		} catch (error) {
+			console.error('온보딩 확인 에러:', error);
+			// 에러가 발생해도 서비스는 계속 사용 가능하도록 함
+			onboardingChecked = true;
+		} finally {
+			checkingOnboarding = false;
+		}
+	}
+	
+	// 사용자 로그인 시 온보딩 확인
+	$effect(() => {
+		if ($user && !$loading && !onboardingChecked) {
+			checkOnboarding();
+		} else if (!$user) {
+			onboardingChecked = false;
+			showOnboarding = false;
+		}
+	});
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
@@ -447,25 +529,42 @@
 				<p class="text-gray-400 text-center">영어로 말하고 AI 튜터와 대화해보세요</p>
 			</div>
 			{#if $user}
-				<button
-					onclick={() => showPastConversations = true}
-					disabled={!hasPastSessions || checkingSessions}
-					class="ml-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-semibold flex items-center gap-2"
-					title={!hasPastSessions ? '과거 기록이 없습니다' : '과거 대화 기록 보기'}
-				>
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					과거 기록
-				</button>
+				<div class="flex gap-2">
+					<button
+						onclick={() => showPromptSettings = true}
+						disabled={!!currentSessionId}
+						class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-semibold flex items-center gap-2"
+						title={currentSessionId ? '세션이 진행 중입니다. 새 세션을 시작하면 설정을 변경할 수 있습니다.' : 'AI 튜터 설정'}
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+						</svg>
+						설정
+					</button>
+					<button
+						onclick={() => showPastConversations = true}
+						disabled={!hasPastSessions || checkingSessions}
+						class="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-semibold flex items-center gap-2"
+						title={!hasPastSessions ? '과거 기록이 없습니다' : '과거 대화 기록 보기'}
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						과거 기록
+					</button>
+				</div>
 			{/if}
 		</div>
 
-		{#if $loading}
+		{#if $loading || checkingOnboarding}
 			<!-- 로딩 중 -->
 			<div class="flex items-center justify-center py-12">
 				<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
 			</div>
+		{:else if showOnboarding}
+			<!-- 온보딩 화면 -->
+			<UserOnboarding onComplete={handleOnboardingComplete} />
 		{:else if !$user}
 			<!-- 로그인하지 않은 경우 -->
 			<div class="text-center py-12">
@@ -621,6 +720,7 @@
 				onClose={() => showSessionSelector = false}
 				onSelectSession={handleSelectSession}
 				onCreateNew={handleCreateNewSession}
+				promptSettings={promptSettings}
 			/>
 
 			<!-- 과거 대화 기록 모달 -->
@@ -631,6 +731,12 @@
 					currentSessionId = session.id;
 					showPastConversations = false;
 				}}
+			/>
+
+			<!-- 프롬프트 설정 모달 -->
+			<PromptSettings
+				bind:isOpen={showPromptSettings}
+				bind:promptSettings={promptSettings}
 			/>
 		{/if}
 	</div>
