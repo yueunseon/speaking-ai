@@ -50,6 +50,15 @@ export async function GET({ request }) {
 		}
 		
 		const sessions = await response.json();
+		
+		// 디버깅: 세션의 prompt_settings 확인
+		if (sessions && Array.isArray(sessions)) {
+			console.log('📋 조회된 세션들:', sessions.map(s => ({
+				id: s.id,
+				hasPromptSettings: !!s.prompt_settings,
+				promptSettings: s.prompt_settings
+			})));
+		}
 		const error = null; // REST API는 error 객체를 반환하지 않음
 
 		console.log('📡 API: Supabase 응답', { 
@@ -93,15 +102,53 @@ export async function POST({ request }) {
 			return json({ error: '인증에 실패했습니다.' }, { status: 401 });
 		}
 
-		// 새 세션 생성 (테이블 컬럼: id, user_id, started_at)
+		const { title, prompt_settings } = await request.json();
+
+		console.log('📝 세션 생성 요청 받음:', {
+			userId: user.id,
+			hasPromptSettings: !!prompt_settings,
+			promptSettings: prompt_settings,
+			promptSettingsType: typeof prompt_settings,
+			promptSettingsStringified: JSON.stringify(prompt_settings)
+		});
+
+		// 새 세션 생성 (테이블 컬럼: id, user_id, started_at, prompt_settings)
 		// Supabase REST API 직접 호출
 		const supabaseUrl = PUBLIC_SUPABASE_URL || '';
 		const supabaseKey = PUBLIC_SUPABASE_ANON_KEY || '';
 		
+		// 프롬프트 설정이 유효한지 확인 (null이 아니고, 빈 객체가 아니고, 실제 데이터가 있는지)
+		let validPromptSettings = null;
+		if (prompt_settings) {
+			if (typeof prompt_settings === 'object') {
+				// 빈 객체가 아니고, 실제로 mode나 다른 필드가 있는지 확인
+				const hasData = Object.keys(prompt_settings).length > 0 && (
+					prompt_settings.mode || 
+					prompt_settings.tone || 
+					prompt_settings.customPrompt
+				);
+				if (hasData) {
+					validPromptSettings = prompt_settings;
+				}
+			} else if (typeof prompt_settings === 'string' && prompt_settings.trim()) {
+				// 문자열인 경우도 유효한 것으로 간주
+				validPromptSettings = prompt_settings;
+			}
+		}
+		
 		const insertData = {
 			user_id: user.id,
-			started_at: new Date().toISOString()
+			started_at: new Date().toISOString(),
+			prompt_settings: validPromptSettings
 		};
+
+		console.log('📤 DB에 저장할 데이터:', {
+			insertData: insertData,
+			insertDataStringified: JSON.stringify(insertData),
+			promptSettingsType: typeof prompt_settings,
+			promptSettingsIsObject: prompt_settings && typeof prompt_settings === 'object',
+			validPromptSettings: validPromptSettings
+		});
 		
 		const response = await fetch(
 			`${supabaseUrl}/rest/v1/conversation_sessions`,
@@ -126,6 +173,12 @@ export async function POST({ request }) {
 		const sessions = await response.json();
 		// REST API는 배열을 반환할 수 있으므로 첫 번째 요소 사용
 		const session = Array.isArray(sessions) && sessions.length > 0 ? sessions[0] : sessions;
+
+		console.log('✅ 세션 생성 완료:', {
+			sessionId: session?.id,
+			hasPromptSettings: !!session?.prompt_settings,
+			promptSettings: session?.prompt_settings
+		});
 
 		if (!session || !session.id) {
 			console.error('세션 생성: 응답 데이터가 올바르지 않음', sessions);

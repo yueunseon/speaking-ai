@@ -3,7 +3,7 @@
 	import { getConversationSessions, createConversationSession } from '$lib/utils/conversations.js';
 	import { user } from '$lib/stores/auth.js';
 	
-	let { isOpen, onClose, onSelectSession, onCreateNew } = $props();
+	let { isOpen, onClose, onSelectSession, onCreateNew, promptSettings = null } = $props();
 	
 	let sessions = $state([]);
 	let loading = $state(false);
@@ -50,7 +50,13 @@
 			if (!userId) {
 				throw new Error('사용자 ID를 가져올 수 없습니다.');
 			}
-			const newSession = await createConversationSession(null, userId);
+		// 프롬프트 설정을 전달 (메인 페이지에서 설정한 값 사용)
+		console.log('📝 SessionSelector: 새 세션 생성', { 
+			userId, 
+			hasPromptSettings: !!promptSettings,
+			promptSettings: promptSettings 
+		});
+		const newSession = await createConversationSession(null, userId, promptSettings);
 			onCreateNew(newSession);
 			onClose();
 		} catch (err) {

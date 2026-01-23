@@ -5,8 +5,9 @@ import { blobToBase64, base64ToBlob } from './format.js';
  * @param {Blob} audioBlob - 녹음된 오디오 Blob
  * @param {string} format - 오디오 포맷
  * @param {Function} onDebug - 디버그 정보 콜백
+ * @param {string} customPrompt - 커스텀 시스템 프롬프트 (선택사항)
  */
-export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null) {
+export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null, customPrompt = null) {
 	const startTime = Date.now();
 	const debugInfo = {
 		request: null,
@@ -48,15 +49,22 @@ export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null) 
 		addLog('API 요청 시작...');
 
 		// API 호출
+		const requestBody = {
+			audioData: base64Audio,
+			format: format
+		};
+		
+		// 커스텀 프롬프트가 있으면 추가
+		if (customPrompt) {
+			requestBody.instructions = customPrompt;
+		}
+
 		const response = await fetch('/api/chat', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({
-				audioData: base64Audio,
-				format: format
-			})
+			body: JSON.stringify(requestBody)
 		});
 
 		const duration = Date.now() - startTime;

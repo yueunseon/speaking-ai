@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 /** @type {import('./$types').RequestHandler} */
 export async function POST({ request }) {
 	try {
-		const { audioData, format = 'webm' } = await request.json();
+		const { audioData, format = 'webm', instructions } = await request.json();
 
 		if (!audioData) {
 			return json({ error: 'Audio data is required' }, { status: 400 });
@@ -21,8 +21,8 @@ export async function POST({ request }) {
 
 		const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-		// 영어회화 튜터 프롬프트
-		const instructions = `You are a friendly and patient English conversation tutor. Your role is to:
+		// 영어회화 튜터 프롬프트 (커스텀 프롬프트가 있으면 사용, 없으면 기본값)
+		const defaultInstructions = `You are a friendly and patient English conversation tutor. Your role is to:
 1. Help users practice English conversation
 2. Provide natural, conversational responses
 3. Gently correct mistakes when appropriate
@@ -31,6 +31,8 @@ export async function POST({ request }) {
 6. Speak in a warm, encouraging tone
 
 Keep your responses concise and natural, as if you're having a real conversation.`;
+
+		const systemPrompt = instructions || defaultInstructions;
 
 		console.log('OpenAI API 호출 시작...');
 		console.log('Audio data length:', audioData?.length || 0);
@@ -89,7 +91,7 @@ Keep your responses concise and natural, as if you're having a real conversation
 			messages: [
 				{
 					role: 'system',
-					content: instructions
+					content: systemPrompt
 				},
 				{
 					role: 'user',

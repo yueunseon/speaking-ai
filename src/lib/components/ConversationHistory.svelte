@@ -1,6 +1,43 @@
 <!--src/lib/components/ConversationHistory.svelte-->
 <script>
 	let { conversations } = $props();
+
+	// 프롬프트 설정을 읽기 쉬운 텍스트로 변환
+	function formatPromptSettings(settings) {
+		if (!settings) return null;
+
+		const toneLabels = {
+			warm: '따뜻하고 격려하는',
+			formal: '정중하고 격식 있는',
+			casual: '캐주얼하고 편안한',
+			friendly: '친근하고 활발한'
+		};
+
+		const correctionLabels = {
+			gently: '부드럽게 교정',
+			strictly: '엄격하게 교정',
+			never: '교정하지 않음'
+		};
+
+		const responseLengthLabels = {
+			concise: '간결하게',
+			medium: '적당하게',
+			detailed: '자세하게'
+		};
+
+		const conversationStyleLabels = {
+			natural: '자연스러운 대화',
+			structured: '구조화된 대화',
+			'free-form': '자유로운 대화'
+		};
+
+		return {
+			tone: toneLabels[settings.tone] || settings.tone,
+			correctionStyle: correctionLabels[settings.correctionStyle] || settings.correctionStyle,
+			responseLength: responseLengthLabels[settings.responseLength] || settings.responseLength,
+			conversationStyle: conversationStyleLabels[settings.conversationStyle] || settings.conversationStyle
+		};
+	}
 </script>
 
 {#if conversations && conversations.length > 0}

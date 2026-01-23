@@ -48,21 +48,31 @@ export async function getConversationSessions(userId) {
  * @param {string} userId - 사용자 ID (호환용, API는 토큰으로 사용자 식별)
  * @returns {Promise<Object>} 생성된 세션
  */
-export async function createConversationSession(title, userId) {
+export async function createConversationSession(title, userId, promptSettings = null) {
 	try {
-		console.log('createConversationSession: 시작', { userId });
+		console.log('createConversationSession: 시작', { 
+			userId, 
+			hasPromptSettings: !!promptSettings,
+			promptSettings: promptSettings 
+		});
 		const currentSession = get(session);
 		if (!currentSession?.access_token) {
 			throw new Error('인증 토큰이 없습니다.');
 		}
-		console.log('📡 fetch 시작: /api/conversations/sessions (POST)');
+		console.log('📡 fetch 시작: /api/conversations/sessions (POST)', {
+			promptSettings: promptSettings,
+			promptSettingsStringified: JSON.stringify(promptSettings)
+		});
 		const res = await fetch('/api/conversations/sessions', {
 			method: 'POST',
 			headers: { 
 				Authorization: `Bearer ${currentSession.access_token}`,
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({ title: null })
+			body: JSON.stringify({ 
+				title: null,
+				prompt_settings: promptSettings
+			})
 		});
 		console.log('📡 fetch 응답:', { status: res.status, ok: res.ok });
 		if (!res.ok) {
@@ -71,7 +81,12 @@ export async function createConversationSession(title, userId) {
 			throw new Error(err?.error || '세션 생성에 실패했습니다.');
 		}
 		const { session: newSession } = await res.json();
-		console.log('✅ createConversationSession 성공:', newSession);
+		console.log('✅ createConversationSession 성공:', {
+			sessionId: newSession?.id,
+			hasPromptSettings: !!newSession?.prompt_settings,
+			promptSettings: newSession?.prompt_settings,
+			originalPromptSettings: promptSettings
+		});
 		return newSession;
 	} catch (error) {
 		console.error('❌ createConversationSession 에러:', error?.message || error);
