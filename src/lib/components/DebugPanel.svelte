@@ -1,3 +1,4 @@
+<!--src/lib/components/DebugPanel.svelte-->
 <script>
 	let { debugInfo, isOpen } = $props();
 </script>

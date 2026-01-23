@@ -1,3 +1,4 @@
+<!--src/lib/components/AIResponse.svelte-->
 <script>
 	let { text, audioUrl } = $props();
 </script>

@@ -109,13 +109,16 @@ Keep your responses concise and natural, as if you're having a real conversation
 			voice: 'alloy',
 			input: aiResponseText
 		});
+		
+		// 사용자 텍스트도 함께 반환
 
 		const audioBufferResponse = Buffer.from(await audioResponse.arrayBuffer());
 		const base64Audio = audioBufferResponse.toString('base64');
 
-		// 응답 반환
+		// 응답 반환 (사용자 텍스트와 AI 응답 텍스트 모두 포함)
 		return json({
-			text: aiResponseText,
+			userText: userText, // 사용자가 말한 내용
+			text: aiResponseText, // AI 튜터 응답
 			audio: base64Audio,
 			format: 'mp3' // TTS API는 mp3 형식 반환
 		});

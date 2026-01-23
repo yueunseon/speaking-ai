@@ -1,3 +1,4 @@
+<!--src/lib/components/StartConversationButton.svelte-->
 <script>
 	let { onStart, isConnecting, isConnected } = $props();
 </script>

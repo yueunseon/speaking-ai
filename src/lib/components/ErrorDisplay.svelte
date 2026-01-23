@@ -1,3 +1,4 @@
+<!--src/lib/components/ErrorDisplay.svelte-->
 <script>
 	let { errorMessage } = $props();
 </script>

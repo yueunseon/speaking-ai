@@ -1,3 +1,4 @@
+<!--src/lib/components/AudioPlayer.svelte-->
 <script>
 	let { audioUrl, title } = $props();
 </script>

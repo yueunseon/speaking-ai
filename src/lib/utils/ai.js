@@ -118,6 +118,7 @@ export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null) 
 		if (onDebug) onDebug({ ...debugInfo });
 
 		return {
+			userText: data.userText || '',
 			text: data.text || '',
 			audio: responseAudioBlob,
 			format: data.format || 'wav'

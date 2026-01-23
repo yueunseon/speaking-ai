@@ -8,6 +8,10 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"sync": "svelte-kit sync",
+		"clean": "rm -rf .svelte-kit node_modules/.vite",
+		"clean:win": "if exist .svelte-kit rmdir /s /q .svelte-kit && if exist node_modules\\.vite rmdir /s /q node_modules\\.vite",
+		"fix-types": "npm run clean:win && npm run sync",
 		"lint": "eslint .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run"
@@ -33,6 +37,7 @@
 	},
 	"dependencies": {
 		"@openai/agents": "^0.4.1",
+		"@supabase/supabase-js": "^2.91.0",
 		"openai": "^6.16.0",
 		"vercel": "^50.4.9"
 	}

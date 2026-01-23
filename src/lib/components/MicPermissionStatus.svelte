@@ -1,3 +1,4 @@
+<!--src/lib/components/MicPermissionStatus.svelte-->
 <script>
 	let { status } = $props();
 </script>

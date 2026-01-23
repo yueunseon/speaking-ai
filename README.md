@@ -20,13 +20,45 @@ npx sv create --template minimal --no-types --add eslint vitest="usages:unit,com
 
 ## 환경 변수 설정
 
-프로젝트 루트에 `.env` 파일을 생성하고 OpenAI API 키를 추가하세요:
+### 로컬 개발 환경
+
+프로젝트 루트에 `.env` 파일을 생성하고 다음 환경 변수를 추가하세요:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
+PUBLIC_SUPABASE_URL=your_supabase_project_url
+PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-OpenAI API 키는 [OpenAI Platform](https://platform.openai.com/api-keys)에서 발급받을 수 있습니다.
+### Vercel 배포 시
+
+Vercel 대시보드에서 다음 환경 변수를 설정하세요:
+
+1. **Settings > Environment Variables**로 이동
+2. 다음 변수들을 추가:
+   - `OPENAI_API_KEY`: OpenAI API 키
+   - `PUBLIC_SUPABASE_URL`: Supabase 프로젝트 URL
+   - `PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key
+
+**참고**: 
+- Site URL은 코드에서 자동으로 감지되므로 별도 환경 변수가 필요하지 않습니다. (`url.origin` 사용)
+- 이메일 확인 링크의 리다이렉트 URL은 자동으로 현재 도메인을 사용합니다.
+- Vercel은 자동으로 `VERCEL_URL` 환경 변수를 제공하지만, 현재 구현에서는 사용하지 않습니다.
+
+- OpenAI API 키는 [OpenAI Platform](https://platform.openai.com/api-keys)에서 발급받을 수 있습니다.
+- Supabase 설정:
+  1. [Supabase](https://supabase.com)에서 프로젝트를 생성하세요
+  2. 프로젝트 설정 > API에서 URL과 anon key를 확인하세요
+  3. Authentication > Settings에서 이메일 인증을 활성화하세요
+  4. **Authentication > URL Configuration**에서 Redirect URLs 설정 (중요!):
+     - **Site URL**: 프로덕션 URL 설정
+       - 예: `https://speaking-ai-five.vercel.app` (Vercel 배포 시)
+       - ⚠️ **주의**: `http://`가 아닌 `https://`를 사용하세요!
+     - **Redirect URLs**: 다음 URL들을 추가하세요:
+       - 개발 환경: `http://localhost:5173/**`
+       - 프로덕션: `https://speaking-ai-five.vercel.app/**` (실제 도메인으로 변경)
+       - Vercel 프리뷰: `https://*-your-team.vercel.app/**` (선택사항)
+     - 이메일 확인 링크가 올바르게 작동하려면 이 설정이 필수입니다!
 
 ## 개발
 
@@ -68,6 +100,7 @@ You can preview the production build with `npm run preview`.
 - 🤖 AI 튜터와 영어 대화 연습
 - 🔊 AI 음성 응답 재생
 - 💾 녹음 파일 다운로드
+- 🔐 회원가입 및 로그인 기능
 
 ## 기술 스택
 

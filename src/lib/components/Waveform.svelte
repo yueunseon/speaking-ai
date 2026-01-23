@@ -1,3 +1,4 @@
+<!--src/lib/components/Waveform.svelte-->
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { drawWaveform, clearWaveform } from '$lib/utils/waveform.js';

@@ -1,3 +1,4 @@
+<!--src/lib/components/MicButton.svelte-->
 <script>
 	let { isRecording, onStart, onStop } = $props();
 </script>
@@ -15,17 +16,15 @@
 				</svg>
 			</button>
 		{:else}
-			<div class="w-full h-full rounded-full bg-red-600 flex items-center justify-center animate-pulse">
-				<button
-					onclick={onStop}
-					class="w-full h-full rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
-					aria-label="녹음 중지"
-				>
-					<svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
-					</svg>
-				</button>
-			</div>
+			<button
+				onclick={onStop}
+				class="w-full h-full rounded-full bg-red-600 flex items-center justify-center animate-pulse hover:bg-red-700 transition-all duration-200 active:scale-95"
+				aria-label="녹음 중지"
+			>
+				<svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+				</svg>
+			</button>
 		{/if}
 	</div>
 </div>

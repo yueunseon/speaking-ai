@@ -1,3 +1,4 @@
+<!--src/lib/components/RecordingTimer.svelte-->
 <script>
 	import { formatTime } from '$lib/utils/format.js';
 	

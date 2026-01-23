@@ -1,3 +1,4 @@
+<!--src/lib/components/ActionButtons.svelte-->
 <script>
 	let { 
 		onSendToAI, 
