@@ -94,25 +94,65 @@ export async function POST({ request }) {
 		const supabaseUrl = PUBLIC_SUPABASE_URL || '';
 		const supabaseKey = PUBLIC_SUPABASE_ANON_KEY || '';
 		
-		const insertData = {
-			user_id: user.id,
-			name,
-			phone_number
-		};
-
-		const response = await fetch(
-			`${supabaseUrl}/rest/v1/user_profiles`,
+		// 기존 프로필 확인
+		const checkResponse = await fetch(
+			`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${user.id}&select=id`,
 			{
-				method: 'POST',
 				headers: {
 					'apikey': supabaseKey,
 					'Authorization': `Bearer ${token}`,
-					'Content-Type': 'application/json',
-					'Prefer': 'resolution=merge-duplicates,return=representation'
-				},
-				body: JSON.stringify(insertData)
+					'Content-Type': 'application/json'
+				}
 			}
 		);
+		
+		const existingData = checkResponse.ok ? await checkResponse.json() : [];
+		const existingProfile = Array.isArray(existingData) && existingData.length > 0 ? existingData[0] : null;
+		
+		const updateData = {
+			name,
+			phone_number
+		};
+		
+		let response;
+		
+		if (existingProfile) {
+			// 기존 프로필이 있으면 PATCH로 업데이트
+			response = await fetch(
+				`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${user.id}`,
+				{
+					method: 'PATCH',
+					headers: {
+						'apikey': supabaseKey,
+						'Authorization': `Bearer ${token}`,
+						'Content-Type': 'application/json',
+						'Prefer': 'return=representation'
+					},
+					body: JSON.stringify(updateData)
+				}
+			);
+		} else {
+			// 기존 프로필이 없으면 POST로 생성
+			const insertData = {
+				user_id: user.id,
+				name,
+				phone_number
+			};
+			
+			response = await fetch(
+				`${supabaseUrl}/rest/v1/user_profiles`,
+				{
+					method: 'POST',
+					headers: {
+						'apikey': supabaseKey,
+						'Authorization': `Bearer ${token}`,
+						'Content-Type': 'application/json',
+						'Prefer': 'return=representation'
+					},
+					body: JSON.stringify(insertData)
+				}
+			);
+		}
 		
 		if (!response.ok) {
 			const errorText = await response.text();

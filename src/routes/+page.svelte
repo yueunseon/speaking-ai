@@ -7,6 +7,7 @@
 	import { user, loading } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
 	import { getSeoulTimeISOString } from '$lib/utils/format.js';
+	import { getUsageByRecordIds, getUsageBySessionAndTime, updateUsageLogRecordId } from '$lib/utils/usage.js';
 	
 	import ErrorDisplay from '$lib/components/ErrorDisplay.svelte';
 	import MicPermissionStatus from '$lib/components/MicPermissionStatus.svelte';
@@ -268,10 +269,19 @@
 				console.log('과거 기록 불러오기 완료:', records);
 				
 				// conversations 배열에 추가 (과거순으로 정렬되어 있음)
+				const recordIds = records.filter(r => r.id).map(r => r.id);
+				let usageMap = {};
+				
+				if (recordIds.length > 0) {
+					usageMap = await getUsageByRecordIds(recordIds);
+				}
+				
 				conversations = records.map(record => ({
 					timestamp: record.created_at,
 					userText: record.user_text || '',
-					aiText: record.ai_text || ''
+					aiText: record.ai_text || '',
+					recordId: record.id,
+					usage: usageMap[record.id] || null
 				}));
 				
 				console.log('conversations 업데이트 완료:', conversations.length, '개 기록');
@@ -319,13 +329,16 @@
 
 		isProcessing = true;
 		errorMessage = '';
+		
+		// API 호출 시작 시간 기록 (사용량 로그와 매칭하기 위해)
+		const apiCallStartTime = new Date();
 
 		try {
 			const customPrompt = generatePrompt(promptSettings);
 			const result = await sendAudioToAI(blob, 'webm', (debug) => {
 				debugInfo = debug;
 				showDebug = true;
-			}, customPrompt);
+			}, customPrompt, currentSessionId);
 
 			// 사용자 텍스트와 AI 응답 텍스트 저장
 			userText = result.userText || '';
@@ -341,11 +354,31 @@
 				});
 			}
 
+			// API 호출 완료 시간 기록
+			const apiCallEndTime = new Date();
+			
+			// 대화 기록에 추가하기 전에 먼저 사용량 정보 가져오기 (실시간 표시용)
+			let tempUsage = null;
+			if (currentSessionId) {
+				try {
+					// session_id와 시간 범위로 사용량 조회 (대화 중 실시간 표시)
+					tempUsage = await getUsageBySessionAndTime(
+						currentSessionId,
+						apiCallStartTime,
+						apiCallEndTime
+					);
+					console.log('📊 실시간 사용량 정보:', tempUsage);
+				} catch (usageError) {
+					console.warn('실시간 사용량 정보 가져오기 실패:', usageError);
+				}
+			}
+
 			// 대화 기록에 추가 (userText, aiResponseText 명시 전달)
 			const uText = result.userText || '';
 			const aText = result.text || '';
 			if (aText) {
-				await addToConversationHistory(uText, aText, blob, result.audio);
+				// 임시 사용량 정보와 함께 대화 기록에 추가
+				await addToConversationHistory(uText, aText, blob, result.audio, tempUsage, apiCallStartTime, apiCallEndTime);
 			}
 		} catch (error) {
 			console.error('AI 통신 실패:', error);
@@ -374,18 +407,22 @@
 		showDebug = false;
 	}
 
-	async function addToConversationHistory(uText, aText, userBlob, aiBlob) {
-		console.log('=== addToConversationHistory 시작 ===', { hasUserText: !!uText, hasAiText: !!aText });
+	async function addToConversationHistory(uText, aText, userBlob, aiBlob, tempUsage = null, apiCallStartTime = null, apiCallEndTime = null) {
+		console.log('=== addToConversationHistory 시작 ===', { hasUserText: !!uText, hasAiText: !!aText, hasTempUsage: !!tempUsage });
 		
 		const newConversation = {
 			timestamp: getSeoulTimeISOString(),
 			userText: uText,
-			aiText: aText
+			aiText: aText,
+			usage: tempUsage // 임시 사용량 정보 포함
 		};
+		
+		// 먼저 임시 사용량 정보와 함께 대화 기록에 추가 (실시간 표시)
+		conversations = [...conversations, newConversation];
+		console.log('로컬 기록 추가 완료 (임시 사용량 정보 포함)');
 		
 		if (!aText || !currentSessionId || !$user) {
 			console.log('조건 불만족, 로컬 기록에만 추가');
-			conversations = [...conversations, newConversation];
 			resetRecording();
 			return;
 		}
@@ -393,7 +430,6 @@
 		try {
 			const userId = $user.id;
 			if (!userId) {
-				conversations = [...conversations, newConversation];
 				resetRecording();
 				return;
 			}
@@ -407,11 +443,57 @@
 				ai_audio_url: null
 			};
 			
-			await saveConversationRecord(recordData, userId);
-			console.log('✅ 기록 저장 완료');
+			const savedRecord = await saveConversationRecord(recordData, userId);
+			console.log('✅ 기록 저장 완료:', savedRecord);
 
-			conversations = [...conversations, newConversation];
-			console.log('로컬 기록 추가 완료');
+			// 저장된 record의 id를 사용하여 사용량 정보 업데이트
+			let usage = tempUsage; // 임시 사용량 정보를 기본값으로 사용
+			if (savedRecord?.id && currentSessionId && apiCallStartTime && apiCallEndTime) {
+				try {
+					// 사용량 로그의 record_id 업데이트 시도
+					if (usage && usage.logs && usage.logs.length > 0) {
+						// record_id가 없는 로그들을 찾아서 업데이트
+						const logsWithoutRecordId = usage.logs.filter(log => !log.record_id);
+						if (logsWithoutRecordId.length > 0) {
+							await updateUsageLogRecordId(
+								savedRecord.id,
+								currentSessionId,
+								{
+									start: apiCallStartTime.toISOString(),
+									end: apiCallEndTime.toISOString()
+								}
+							);
+							
+							// 업데이트 후 다시 조회
+							await new Promise(resolve => setTimeout(resolve, 300));
+							usage = await getUsageBySessionAndTime(
+								currentSessionId,
+								apiCallStartTime,
+								apiCallEndTime
+							);
+						}
+					}
+					
+					// record_id로도 한 번 더 시도
+					if (!usage || !usage.logs || usage.logs.length === 0) {
+						const usageData = await getUsageByRecordIds([savedRecord.id]);
+						usage = usageData[savedRecord.id] || tempUsage;
+					}
+				} catch (usageError) {
+					console.warn('사용량 정보 업데이트 실패:', usageError);
+				}
+			}
+
+			// 대화 기록 업데이트 (record_id와 최종 사용량 정보 포함)
+			const conversationIndex = conversations.length - 1;
+			if (conversationIndex >= 0) {
+				conversations[conversationIndex] = {
+					...conversations[conversationIndex],
+					recordId: savedRecord?.id,
+					usage: usage
+				};
+				console.log('대화 기록 업데이트 완료 (최종 사용량 정보 포함)');
+			}
 		} catch (error) {
 			console.error('❌ 기록 저장 에러:', error);
 			conversations = [...conversations, newConversation];

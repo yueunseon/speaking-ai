@@ -77,7 +77,7 @@ export async function POST({ request }) {
 			return json({ error: '인증에 실패했습니다.' }, { status: 401 });
 		}
 
-		const { privacy_policy_consent, service_terms_consent } = await request.json();
+		const { privacy_policy_consent, service_terms_consent, privacy_policy_version, service_terms_version } = await request.json();
 
 		// 입력 검증
 		if (typeof privacy_policy_consent !== 'boolean' || typeof service_terms_consent !== 'boolean') {
@@ -113,6 +113,12 @@ export async function POST({ request }) {
 			existingConsents.privacy_policy_consent_at : now;
 		const service_consent_at = existingConsents?.service_terms_consent ? 
 			existingConsents.service_terms_consent_at : now;
+		
+		// 버전 설정 (새로 동의하는 경우에만 버전 업데이트)
+		const privacy_version = existingConsents?.privacy_policy_consent ? 
+			existingConsents.privacy_policy_version : (privacy_policy_version || '1.0');
+		const service_version = existingConsents?.service_terms_consent ? 
+			existingConsents.service_terms_version : (service_terms_version || '1.0');
 
 		// 동의 정보 저장 또는 업데이트
 		const insertData = {
@@ -120,7 +126,9 @@ export async function POST({ request }) {
 			privacy_policy_consent: true,
 			service_terms_consent: true,
 			privacy_policy_consent_at: privacy_consent_at,
-			service_terms_consent_at: service_consent_at
+			service_terms_consent_at: service_consent_at,
+			privacy_policy_version: privacy_version,
+			service_terms_version: service_version
 		};
 
 		const response = await fetch(

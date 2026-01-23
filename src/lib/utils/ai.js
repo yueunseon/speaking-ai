@@ -6,8 +6,9 @@ import { blobToBase64, base64ToBlob } from './format.js';
  * @param {string} format - 오디오 포맷
  * @param {Function} onDebug - 디버그 정보 콜백
  * @param {string} customPrompt - 커스텀 시스템 프롬프트 (선택사항)
+ * @param {string} sessionId - 세션 ID (선택사항, 사용량 추적용)
  */
-export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null, customPrompt = null) {
+export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null, customPrompt = null, sessionId = null) {
 	const startTime = Date.now();
 	const debugInfo = {
 		request: null,
@@ -58,12 +59,27 @@ export async function sendAudioToAI(audioBlob, format = 'webm', onDebug = null, 
 		if (customPrompt) {
 			requestBody.instructions = customPrompt;
 		}
+		
+		// 세션 ID가 있으면 추가
+		if (sessionId) {
+			requestBody.session_id = sessionId;
+		}
+
+		// 인증 토큰 가져오기
+		const { get } = await import('svelte/store');
+		const { session } = await import('$lib/stores/auth.js');
+		const currentSession = get(session);
+		const headers = {
+			'Content-Type': 'application/json'
+		};
+		
+		if (currentSession?.access_token) {
+			headers['Authorization'] = `Bearer ${currentSession.access_token}`;
+		}
 
 		const response = await fetch('/api/chat', {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
+			headers: headers,
 			body: JSON.stringify(requestBody)
 		});
 

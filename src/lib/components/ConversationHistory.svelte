@@ -1,5 +1,7 @@
 <!--src/lib/components/ConversationHistory.svelte-->
 <script>
+	import { formatUsage, formatCost, formatDuration, formatModelName } from '$lib/utils/usage.js';
+
 	let { conversations } = $props();
 
 	// 프롬프트 설정을 읽기 쉬운 텍스트로 변환
@@ -59,10 +61,29 @@
 								</svg>
 							</div>
 							<div class="flex-1 min-w-0">
-								<div class="text-xs text-blue-400 font-medium mb-1">내가 말한 내용</div>
+								<div class="flex items-center justify-between mb-1">
+									<div class="text-xs text-blue-400 font-medium">내가 말한 내용</div>
+									{#if conversation.usage?.byType?.whisper && conversation.usage.byType.whisper.length > 0}
+										{@const whisperLog = conversation.usage.byType.whisper[0]}
+										<div class="text-xs text-gray-500 flex items-center gap-1">
+											<span>Whisper</span>
+											<span class="text-green-400">{formatCost(whisperLog.cost_usd)}</span>
+										</div>
+									{/if}
+								</div>
 								<div class="bg-gray-800 rounded-lg p-3 text-gray-300 text-sm whitespace-pre-wrap">
 									{conversation.userText || '(인식된 내용 없음)'}
 								</div>
+								{#if conversation.usage?.byType?.whisper && conversation.usage.byType.whisper.length > 0}
+									{@const whisperLog = conversation.usage.byType.whisper[0]}
+									<div class="mt-1 text-xs text-gray-500 flex items-center gap-2">
+										<span>사용량: {formatUsage(whisperLog.usage_amount, whisperLog.usage_unit)}</span>
+										<span>•</span>
+										<span>모델: {formatModelName(whisperLog.model)}</span>
+										<span>•</span>
+										<span>소요 시간: {formatDuration(whisperLog.duration_seconds || 0)}</span>
+									</div>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -76,10 +97,57 @@
 								</svg>
 							</div>
 							<div class="flex-1 min-w-0">
-								<div class="text-xs text-purple-400 font-medium mb-1">AI 응답</div>
+								<div class="flex items-center justify-between mb-1">
+									<div class="text-xs text-purple-400 font-medium">AI 응답</div>
+									{#if conversation.usage}
+										<div class="text-xs text-gray-500 flex items-center gap-1">
+											{#if conversation.usage.byType?.chat && conversation.usage.byType.chat.length > 0}
+												{@const chatLog = conversation.usage.byType.chat[0]}
+												<span>Chat</span>
+												<span class="text-green-400">{formatCost(chatLog.cost_usd)}</span>
+											{/if}
+											{#if conversation.usage.byType?.tts && conversation.usage.byType.tts.length > 0}
+												{@const ttsLog = conversation.usage.byType.tts[0]}
+												<span>+ TTS</span>
+												<span class="text-green-400">{formatCost(ttsLog.cost_usd)}</span>
+											{/if}
+											{#if conversation.usage.totalCost > 0}
+												<span class="text-yellow-400 font-semibold">총 {formatCost(conversation.usage.totalCost)}</span>
+											{/if}
+										</div>
+									{/if}
+								</div>
 								<div class="bg-gray-800 rounded-lg p-3 text-gray-300 text-sm whitespace-pre-wrap">
 									{conversation.aiText || ''}
 								</div>
+								{#if conversation.usage}
+									<div class="mt-1 space-y-1">
+										{#if conversation.usage.byType?.chat && conversation.usage.byType.chat.length > 0}
+											{@const chatLog = conversation.usage.byType.chat[0]}
+											<div class="text-xs text-gray-500 flex items-center gap-2">
+												<span>Chat 사용량: {formatUsage(chatLog.usage_amount, chatLog.usage_unit)}</span>
+												<span>•</span>
+												<span>모델: {formatModelName(chatLog.model)}</span>
+												{#if chatLog.metadata?.inputTokens && chatLog.metadata?.outputTokens}
+													<span>•</span>
+													<span>(입력: {chatLog.metadata.inputTokens}, 출력: {chatLog.metadata.outputTokens})</span>
+												{/if}
+												<span>•</span>
+												<span>소요 시간: {formatDuration(chatLog.duration_seconds || 0)}</span>
+											</div>
+										{/if}
+										{#if conversation.usage.byType?.tts && conversation.usage.byType.tts.length > 0}
+											{@const ttsLog = conversation.usage.byType.tts[0]}
+											<div class="text-xs text-gray-500 flex items-center gap-2">
+												<span>TTS 사용량: {formatUsage(ttsLog.usage_amount, ttsLog.usage_unit)}</span>
+												<span>•</span>
+												<span>모델: {formatModelName(ttsLog.model)}</span>
+												<span>•</span>
+												<span>소요 시간: {formatDuration(ttsLog.duration_seconds || 0)}</span>
+											</div>
+										{/if}
+									</div>
+								{/if}
 							</div>
 						</div>
 					</div>

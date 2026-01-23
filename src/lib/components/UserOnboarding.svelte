@@ -2,6 +2,7 @@
 <script>
 	import { session } from '$lib/stores/auth.js';
 	import { get } from 'svelte/store';
+	import { CURRENT_PRIVACY_POLICY_VERSION, CURRENT_SERVICE_TERMS_VERSION } from '$lib/utils/consent-versions.js';
 	
 	let { onComplete } = $props();
 	
@@ -63,7 +64,7 @@
 				throw new Error(profileError.error || '프로필 저장에 실패했습니다.');
 			}
 
-			// 동의 정보 저장
+			// 동의 정보 저장 (현재 약관 버전 포함)
 			const consentsResponse = await fetch('/api/user/consents', {
 				method: 'POST',
 				headers: {
@@ -72,7 +73,9 @@
 				},
 				body: JSON.stringify({
 					privacy_policy_consent: true,
-					service_terms_consent: true
+					service_terms_consent: true,
+					privacy_policy_version: CURRENT_PRIVACY_POLICY_VERSION,
+					service_terms_version: CURRENT_SERVICE_TERMS_VERSION
 				})
 			});
 
